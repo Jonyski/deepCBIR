@@ -1,6 +1,7 @@
-from flask import Flask, request, session, redirect, url_for, render_template, flash, send_from_directory
-from werkzeug import secure_filename
+from flask import Flask, request, session, redirect, url_for, render_template, flash, send_from_directory, current_app
+from werkzeug.utils import secure_filename
 from .models import deepCBIR
+import os
 
 cbir = deepCBIR()
 app = Flask(__name__)
@@ -31,9 +32,10 @@ def retrieve():
 
 @app.route('/uploads/<path:filename>')
 def get_images(filename):
-    return send_from_directory("/Users/pidahbus/Documents/Dissertation/GitHub/deepCBIR/app/tmp",
-                               filename, as_attachment=True, cache_timeout=0)
-
+    base_dir = os.path.dirname(current_app.root_path) # This should get you to the root directory (deepCBIR-main)
+    image_directory = os.path.join(base_dir, 'app', 'tmp')
+    return send_from_directory(image_directory,
+                                filename, as_attachment=True, cache_timeout=0)
 
 @app.after_request
 def add_header(r):

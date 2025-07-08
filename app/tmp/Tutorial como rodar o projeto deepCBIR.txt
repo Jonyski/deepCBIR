@@ -1,0 +1,57 @@
+Tutorial como rodar o projeto deepCBIR
+1. Instale esses trecos:
+    1.1. sudo apt-get install -y software-properties-common
+    1.2. sudo apt-get install -y dirmngr gnupg2
+
+2. Instale e compile o python 3.8:
+    2.1. sudo apt-get update sudo apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev wget
+    2.2. wget https://www.python.org/ftp/python/3.8.12/Python-3.8.12.tar.xz
+tar -xf Python-3.8.12.tar.xz
+cd Python-3.8.12
+./configure --enable-optimizations
+make -j $(nproc)
+sudo make altinstall
+(*isso pode demorar um pouco*)
+    2.3. python3.8 --version (conferindo se o python 3.8 instalou corretamente)
+
+3. Clone o repositório
+    3.1. git clone git@github.com:pidahbus/deepCBIR.git
+    3.2. cd ./deepCBIR
+
+4. Crie um ambiente virtual com python 3.8
+    4.1. python3.8 -m venv venv
+    4.2. source venv/bin/activate
+
+5. Baixe as dependências
+    5.1. pip install -r requirements.txt
+
+6. Instale versões antigas desse monte de pacotes que tem conflito com o flask
+    6.1. pip install --force-reinstall "jinja2<3.0.0" "markupsafe<2.0.0"
+    6.2. pip install --force-reinstall "werkzeug<2.1.0"
+    6.3. pip install --force-reinstall "itsdangerous<2.1.0"
+
+7. Mude o import no arquivo views.py
+    7.1. de "from werkzeug import secure_filename"
+    para "from werkzeug.utils import secure_filename"
+
+8. Desista
+
+9. Instale o Conda
+    9.1. wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+    9.2. bash miniconda.sh
+    9.3. source ~/.bashrc
+
+10. Crie um ambiente conda
+    10.1. conda create -n deepcbir python=3.8
+    10.2. conda activate deepcbir
+
+11. Instale as dependências via Conda (confie no Conda, ele sabe de tudo)
+    11.1. conda install -c conda-forge numpy=1.18.5 tensorflow=2.3.0 pandas=1.2.5 flask=1.1.2 werkzeug=1.0.1 jinja2=2.11.3 markupsafe=1.1.1 itsdangerous=1.1.0
+
+12. Instale o Ioguru e outros pacotes faltantes com Conda
+    12.1. conda install -c conda-forge loguru
+    12.2. conda install -c conda-forge tqdm
+    12.3. conda install -c conda-forge matplotlib
+
+13. Rode o programa
+    13.1. python3 run.py

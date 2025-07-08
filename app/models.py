@@ -13,7 +13,6 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing import image
 
 
-
 class deepCBIR:
     def __init__(self):
         logger.info("App is loading. It will load the model and also vectorize the database image. Depending on your"\
@@ -53,8 +52,9 @@ class deepCBIR:
 
     def retrieve_images(self, query_img_path, scope):
         query = self.img_to_encoding(query_img_path, self.cbir_model)
+        # Linha que calcula as distâncias para a query?
         dist_vec = np.linalg.norm(self.features - query, axis=1)
-
+        # Modificação: usar ordenação lexicográfica
         df = pd.DataFrame({"image_url":list(self.database.keys()), "distance":dist_vec})
         df = df.sort_values("distance").reset_index(drop=True)
         return df["image_url"][:scope].tolist()
@@ -90,6 +90,3 @@ class deepCBIR:
                     axes[y, x].axis("off")
 
             fig.savefig("./app/tmp/retrieved.jpg")
-
-
-
