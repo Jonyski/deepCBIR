@@ -1,4 +1,3 @@
-from loguru import logger
 from tqdm import tqdm
 import numpy as np
 import glob
@@ -52,12 +51,45 @@ class deepCBIR:
 
     def retrieve_images(self, query_img_path, scope):
         query = self.img_to_encoding(query_img_path, self.cbir_model)
-        # Linha que calcula as distâncias para a query?
-        dist_vec = np.linalg.norm(self.features - query, axis=1)
-        # Modificação: usar ordenação lexicográfica
-        df = pd.DataFrame({"image_url":list(self.database.keys()), "distance":dist_vec})
-        df = df.sort_values("distance").reset_index(drop=True)
-        return df["image_url"][:scope].tolist()
+
+        # MODO ANTIGO DE ANÁLISE DE SIMILARIDADE (VIA DISTÂNCIA EUCLIDIANA)
+        #   dist_vec = np.linalg.norm(self.features - query, axis=1)
+        #   df = pd.DataFrame({"image_url":list(self.database.keys()), "distance":dist_vec})
+        #   df = df.sort_values("distance").reset_index(drop=True)
+        #   return df["image_url"][:scope].tolist()
+
+        # MODO NOVO DE ANÁLISE DE SIMILARIDADE (VIA ELO)
+        sum_diff = np.abs(self.features.sum(axis=1) - query.sum())
+        chebyshev_dist = np.max(np.abs(self.features - query), axis=1)
+        sorted_indices = np.lexsort((chebyshev_dist, sum_diff))
+        image_urls = np.array(list(self.database.keys()))
+        sorted_urls = image_urls[sorted_indices]
+
+        # DEBUG -----------------------------------------------------------
+        # Pega os valores das chaves na ordem em que foram classificados
+        sorted_sum_diff = sum_diff[sorted_indices]
+        sorted_chebyshev = chebyshev_dist[sorted_indices]
+        
+        print(f"Soma do Vetor de Consulta: {query.sum():.4f}\n")
+        
+        # Imprime o cabeçalho da tabela de resultados
+        header = f"{'Rank':<5} | {'Image URL':<30} | {'Chave Primária (Sum Diff)':<30} | {'Chave Secundária (Chebyshev)'}"
+        print(header)
+        print("-" * len(header))
+
+        # Itera sobre os n primeiros resultados para imprimir seus detalhes
+        for i in range(scope):
+            rank = i + 1
+            url = sorted_urls[i]
+            primary_key = sorted_sum_diff[i]
+            secondary_key = sorted_chebyshev[i]
+            info = f"{rank:<5} | {url:<30} | {primary_key:<30.4f} | {secondary_key:.4f}"
+            print(info)
+        
+        print("-" * len(header))
+        # FIM DO DEBUG ----------------------------------------------------
+        
+        return sorted_urls[:scope].tolist()
 
     def create_plot(self, image_paths):
         if len(image_paths) == 1:
