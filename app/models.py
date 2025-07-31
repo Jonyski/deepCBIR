@@ -6,11 +6,15 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from PIL import Image
+import os
+import logging
 
 from tensorflow.keras.applications import InceptionResNetV2
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing import image
 
+# É uma boa prática ter um logger configurado.
+logger = logging.getLogger(__name__)
 
 class deepCBIR:
     def __init__(self):
@@ -49,7 +53,7 @@ class deepCBIR:
         embedding = model.predict_on_batch(x)
         return embedding
 
-    def retrieve_images(self, query_img_path, scope):
+    def retrieve_images(self, query_img_path, scope, debug):
         query = self.img_to_encoding(query_img_path, self.cbir_model)
 
         # MODO ANTIGO DE ANÁLISE DE SIMILARIDADE (VIA DISTÂNCIA EUCLIDIANA)
@@ -66,32 +70,96 @@ class deepCBIR:
         sorted_urls = image_urls[sorted_indices]
 
         # DEBUG -----------------------------------------------------------
-        # Pega os valores das chaves na ordem em que foram classificados
-        sorted_sum_diff = sum_diff[sorted_indices]
-        sorted_chebyshev = chebyshev_dist[sorted_indices]
-        
-        print(f"Soma do Vetor de Consulta: {query.sum():.4f}\n")
-        
-        # Imprime o cabeçalho da tabela de resultados
-        header = f"{'Rank':<5} | {'Image URL':<30} | {'Chave Primária (Sum Diff)':<30} | {'Chave Secundária (Chebyshev)'}"
-        print(header)
-        print("-" * len(header))
+        if debug:
+            # Pega os valores das chaves na ordem em que foram classificados
+            sorted_sum_diff = sum_diff[sorted_indices]
+            sorted_chebyshev = chebyshev_dist[sorted_indices]
+            
+            print(f"Soma do Vetor de Consulta: {query.sum():.4f}\n")
+            
+            # Imprime o cabeçalho da tabela de resultados
+            header = f"{'Rank':<5} | {'Image URL':<30} | {'Chave Primária (Sum Diff)':<30} | {'Chave Secundária (Chebyshev)'}"
+            print(header)
+            print("-" * len(header))
 
-        # Itera sobre os n primeiros resultados para imprimir seus detalhes
-        for i in range(scope):
-            rank = i + 1
-            url = sorted_urls[i]
-            primary_key = sorted_sum_diff[i]
-            secondary_key = sorted_chebyshev[i]
-            info = f"{rank:<5} | {url:<30} | {primary_key:<30.4f} | {secondary_key:.4f}"
-            print(info)
-        
-        print("-" * len(header))
+            # Itera sobre os n primeiros resultados para imprimir seus detalhes
+            for i in range(scope):
+                rank = i + 1
+                url = sorted_urls[i]
+                primary_key = sorted_sum_diff[i]
+                secondary_key = sorted_chebyshev[i]
+                info = f"{rank:<5} | {url:<30} | {primary_key:<30.4f} | {secondary_key:.4f}"
+                print(info)
+            
+            print("-" * len(header))
         # FIM DO DEBUG ----------------------------------------------------
         
         return sorted_urls[:scope].tolist()
 
+    def evaluate_precision_recall(self, scope):
+        # Construindo o mapa com a categoria de cada imagem: { 'nome_do_arquivo.jpg': 'categoria', ... }
+        category_map = {}
+        category_paths = glob.glob(os.path.join("./app/database/101_ObjectCategories", "*"))
+        for category_path in category_paths:
+            if not os.path.isdir(category_path): continue
+            category_name = os.path.basename(category_path)
+            image_files = glob.glob(os.path.join(category_path, "*"))
+            for img_path in image_files:
+                img_filename = os.path.basename(img_path)
+                category_map[img_filename] = category_name
+
+        # Contando o total de imagens por categoria para o cálculo da revocação
+        category_counts = {}
+        for category in category_map.values():
+            category_counts[category] = category_counts.get(category, 0) + 1
+
+        # Executando a avaliação
+        all_images = list(self.database.keys())
+        num_images_evaluated = 0
+        total_precision = 0
+        total_recall = 0
+
+        for query_path in tqdm(all_images, desc="Evaluating Precision & Recall"):
+            query_filename = os.path.basename(query_path)
+
+            # Pulando arquivos que não têm uma categoria definida
+            if query_filename not in category_map:
+                continue
+
+            num_images_evaluated += 1
+            query_category = category_map[query_filename]
+            
+            # Obtendo os resultados da busca.
+            retrieved_paths = self.retrieve_images(query_path, scope=scope, debug=False)
+            
+            # Contando os acertos.
+            true_positives = 0
+            for path in retrieved_paths:
+                retrieved_filename = os.path.basename(path)
+                if category_map.get(retrieved_filename) == query_category:
+                    true_positives += 1
+            
+            # Calcula precisão e revocação para esta consulta.
+            precision = true_positives / scope if scope > 0 else 0
+            total_relevant_in_category = category_counts.get(query_category, 0)
+            recall = true_positives / total_relevant_in_category if total_relevant_in_category > 0 else 0
+            
+            total_precision += precision
+            total_recall += recall
+
+        # Calculando as médias e exibindo os resultados.
+        mean_precision = (total_precision / num_images_evaluated) * 100 if num_images_evaluated > 0 else 0
+        mean_recall = (total_recall / num_images_evaluated) * 100 if num_images_evaluated > 0 else 0
+        
+        print("\n____ Resultados da Avaliação ____")
+        print(f"Scope (k) .............: {scope} imagens recuperadas por consulta")
+        print(f"Total de Consultas ....: {num_images_evaluated} imagens avaliadas")
+        print(f"Precisão Média ........: {mean_precision:.2f}%")
+        print(f"Revocação Média .......: {mean_recall:.2f}%")
+
     def create_plot(self, image_paths):
+        pass
+
         if len(image_paths) == 1:
             img = Image.open(image_paths[0])
             fig, ax = plt.subplots()

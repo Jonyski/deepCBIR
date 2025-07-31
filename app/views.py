@@ -24,7 +24,7 @@ def retrieve():
     query_img_path = "./app/tmp/query.jpg"
     query.save(query_img_path)
 
-    retrieve_img_paths = cbir.retrieve_images(query_img_path, scope=scope)
+    retrieve_img_paths = cbir.retrieve_images(query_img_path, scope=scope, debug=False)
     cbir.create_plot([query_img_path])
     cbir.create_plot(retrieve_img_paths)
 
